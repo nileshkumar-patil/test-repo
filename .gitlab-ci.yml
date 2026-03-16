@@ -1,0 +1,33 @@
+stages:
+  - deploy-infrastructure
+  - deploy-databricks
+
+variables:
+  TF_ROOT: ${CI_PROJECT_DIR}/terraform
+
+# 1. Deploy AWS and Databricks Infrastructure using Terraform
+terraform:
+  stage: deploy-infrastructure
+  image: hashicorp/terraform:latest
+  script:
+    - cd ${TF_ROOT}
+    - terraform init
+    - terraform apply -auto-approve
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+
+# 2. Deploy notebook files using Databricks CLI
+databricks-assets:
+  stage: deploy-databricks
+  image: ubuntu:latest
+  needs: ["terraform"]
+  before_script:
+    - apt-get update && apt-get install -y curl unzip
+    - curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/setup.sh | sh
+  script:
+    - echo "Deploying notebooks to Databricks workspace..."
+    # Example command to sync the repository to a Databricks Workspace directory:
+    - databricks workspace import_dir ./ingestion /Workspace/Users/tsnpdcl_admin/tsnpdcl_analytics/ingestion -o
+    - databricks workspace import_dir ./etl /Workspace/Users/tsnpdcl_admin/tsnpdcl_analytics/etl -o
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
