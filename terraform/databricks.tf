@@ -1,7 +1,7 @@
 resource "databricks_job" "tsnpdcl_pipeline" {
   name = "${var.project_prefix}-end-to-end-pipeline-${var.environment}"
 
-  job_clusters {
+  job_cluster {
     job_cluster_key = "serverless_compute"
 
     new_cluster {
