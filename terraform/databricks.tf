@@ -1,6 +1,11 @@
 resource "databricks_job" "tsnpdcl_pipeline" {
   name = "${var.project_prefix}-end-to-end-pipeline-${var.environment}"
 
+  depends_on = [
+    aws_s3_object.trigger_dir,
+    databricks_external_location.datalake_loc
+  ]
+
   email_notifications {
     on_success = ["nileshkumar.patil@zemosolabs.com"]
     on_failure = ["nileshkumar.patil@zemosolabs.com"]
