@@ -37,11 +37,11 @@ variable "databricks_account_id" {
 variable "sql_warehouse_id" {
   type        = string
   description = "The ID of a Databricks SQL Warehouse to trigger dashboard refreshes"
-  default     = "" # Optional if relying purely on Lakeview schedules
+  default     = "7474648073325275" # Optional if relying purely on Lakeview schedules
 }
 
 variable "workspace_code_path" {
   type        = string
   description = "The workspace path where the Databricks notebook code relies"
-  default     = "/Workspace/Users/nileshkumar.patl@zemosolabs.com/TSNPDCL"
+  default     = "/Workspace/Users/nileshkumar.patil@zemosolabs.com/TSNPDCL"
 }
