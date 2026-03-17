@@ -105,3 +105,46 @@ resource "databricks_job" "tsnpdcl_pipeline" {
     }
   }
 }
+
+# ------------------------------------------------------------------------------
+# 3. Automated Lakeview Dashboard creation via Terraform
+# ------------------------------------------------------------------------------
+resource "databricks_dashboard" "executive_summary" {
+  name        = "TSNPDCL Smart Grid Executive Summary"
+  parent_path = "/Workspace/Users/nileshkumar.patl@zemosolabs.com/Dashboards"
+  
+  serialized_dashboard = jsonencode({
+    "name" : "TSNPDCL Smart Grid Executive Summary",
+    "pages" : [
+      {
+        "name" : "Page 1",
+        "widgets" : []
+      }
+    ],
+    "datasets" : [
+      {
+        "name" : "District Efficiency",
+        "query" : "SELECT Circle, Units_Billed_per_Service as `Efficiency Score` FROM tsnpdcl_prod.gold.district_performance ORDER BY `Efficiency Score` DESC"
+      },
+      {
+         "name" : "MoM Growth",
+         "query": "SELECT Circle, extraction_month as Month, MoM_Growth_Rate FROM tsnpdcl_prod.gold.growth_trends WHERE extraction_year = YEAR(CURRENT_DATE())"
+      }
+    ]
+  })
+}
+
+resource "databricks_job" "dashboard_refresher" {
+  name = "${var.project_prefix}-dashboard-refresh"
+  
+  task {
+    task_key = "refresh"
+    
+    sql_task {
+      dashboard {
+        dashboard_id = databricks_dashboard.executive_summary.id
+      }
+      warehouse_id = var.sql_warehouse_id
+    }
+  }
+}
