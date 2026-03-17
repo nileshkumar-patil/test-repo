@@ -1,7 +1,7 @@
 resource "databricks_job" "tsnpdcl_pipeline" {
   name = "${var.project_prefix}-end-to-end-pipeline-${var.environment}"
 
-  job_cluster {
+  job_clusters {
     job_cluster_key = "serverless_compute"
 
     new_cluster {
@@ -118,17 +118,20 @@ resource "databricks_dashboard" "executive_summary" {
     "name" : "TSNPDCL Smart Grid Executive Summary",
     "pages" : [
       {
-        "name" : "Page 1",
+        "name" : "Page_1",
+        "displayName": "Page 1",
         "widgets" : []
       }
     ],
     "datasets" : [
       {
-        "name" : "District Efficiency",
+        "name" : "District_Efficiency",
+        "displayName": "District Efficiency",
         "query" : "SELECT Circle, Units_Billed_per_Service as `Efficiency Score` FROM tsnpdcl_prod.gold.district_performance ORDER BY `Efficiency Score` DESC"
       },
       {
-         "name" : "MoM Growth",
+         "name" : "MoM_Growth",
+         "displayName": "MoM Growth",
          "query": "SELECT Circle, extraction_month as Month, MoM_Growth_Rate FROM tsnpdcl_prod.gold.growth_trends WHERE extraction_year = YEAR(CURRENT_DATE())"
       }
     ]

@@ -43,40 +43,24 @@ resource "aws_s3_bucket_versioning" "datalake_versioning" {
 # IAM Cross-Account Role for Databricks Access
 # ------------------------------------------------------------------------------
 
-# 1. Trust Policy allowing Databricks AWS Account to assume this role
+data "aws_caller_identity" "current" {}
+
+data "databricks_aws_assume_role_policy" "workspace" {
+  external_id = var.databricks_workspace_id
+}
+
+data "databricks_aws_unity_catalog_assume_role_policy" "uc" {
+  aws_account_id = data.aws_caller_identity.current.account_id
+  role_name      = "${var.project_prefix}-databricks-access-${var.environment}"
+  external_id    = var.databricks_account_id
+}
+
+# Combine the Workspaces and Unity Catalog trust policies dynamically
 data "aws_iam_policy_document" "databricks_trust_policy" {
-  statement {
-    actions = ["sts:AssumeRole"]
-    
-    principals {
-      type        = "AWS"
-      # This is the official Databricks AWS Account ID for cross-account roles
-      identifiers = ["arn:aws:iam::414360345950:root"]
-    }
-
-    condition {
-      test     = "StringEquals"
-      variable = "sts:ExternalId"
-      values   = [var.databricks_workspace_id]
-    }
-  }
-
-  # Add Unity Catalog Trust Policy (Allows UC to assume this role for External Locations)
-  statement {
-    actions = ["sts:AssumeRole"]
-    
-    principals {
-      type        = "AWS"
-      identifiers = ["arn:aws:iam::414360345950:root"]
-    }
-
-    condition {
-      test     = "StringEquals"
-      variable = "sts:ExternalId"
-      # This is the Databricks Account ID used for Unity Catalog (you must pass this in)
-      values   = [var.databricks_account_id]
-    }
-  }
+  source_policy_documents = [
+    data.databricks_aws_assume_role_policy.workspace.json,
+    data.databricks_aws_unity_catalog_assume_role_policy.uc.json
+  ]
 }
 
 resource "aws_iam_role" "databricks_data_access" {
