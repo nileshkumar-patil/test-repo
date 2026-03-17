@@ -83,20 +83,7 @@ resource "databricks_job" "tsnpdcl_pipeline" {
     }
   }
 
-  # ---------------------------------------------------
-  # Task 5: Refresh Dashboard
-  # ---------------------------------------------------
-  task {
-    task_key = "refresh_executive_dashboard"
 
-    depends_on {
-      task_key = "gold_batch_aggregation"
-    }
-
-    run_job_task {
-      job_id = databricks_job.dashboard_refresher.id
-    }
-  }
 
   # Trigger on S3 file arrival
   trigger {
@@ -136,19 +123,4 @@ resource "databricks_dashboard" "executive_summary" {
       }
     ]
   })
-}
-
-resource "databricks_job" "dashboard_refresher" {
-  name = "${var.project_prefix}-dashboard-refresh"
-  
-  task {
-    task_key = "refresh"
-    
-    sql_task {
-      dashboard {
-        dashboard_id = databricks_dashboard.executive_summary.id
-      }
-      warehouse_id = var.sql_warehouse_id
-    }
-  }
 }

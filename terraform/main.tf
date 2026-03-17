@@ -108,6 +108,9 @@ resource "databricks_storage_credential" "datalake_cred" {
     role_arn = aws_iam_role.databricks_data_access.arn
   }
   comment = "Managed by Terraform: Credential for accessing the S3 Data Lake"
+  depends_on = [
+    aws_iam_role_policy.databricks_s3_access
+  ]
 }
 
 # 2. Create the External Location mapping to the S3 Bucket using the Credential
@@ -116,4 +119,7 @@ resource "databricks_external_location" "datalake_loc" {
   url             = "s3://${aws_s3_bucket.datalake.id}"
   credential_name = databricks_storage_credential.datalake_cred.id
   comment         = "Managed by Terraform: External Location for Bronze/Silver/Gold data"
+  depends_on = [
+    databricks_storage_credential.datalake_cred
+  ]
 }
