@@ -32,10 +32,17 @@ tsnpdcl_analytics/
 
 ## Setup & Deployment (AWS + Databricks)
 
-1.  **AWS S3 Setup**: Create an AWS S3 bucket to act as the Data Lake (`tsnpdcl-datalake-poc`).
-2.  **IAM Integration**: Apply an AWS Instance Profile to the Databricks cluster allowing it read/write access to the specific S3 bucket.
-3.  **Run Pipeline**: Execute the notebooks in `etl/` (Bronze -> Silver -> Gold) sequentially on a Databricks Single-Node interactive cluster. Ensure the `S3_BUCKET` variable in the scripts points to your bucket.
-4.  **Amazon Athena**: Run an AWS Glue crawler over the `s3://.../gold/` paths to populate the AWS Glue Data Catalog. Open Amazon Athena and query the Gold data for pennies.
+This project strictly follows the industry standard split architecture: **Terraform** for AWS Infrastructure, and **Databricks Asset Bundles (DABs)** for Data Workloads.
+
+1.  **AWS Infrastructure (Terraform)**: 
+    * Navigate to `/terraform` and run `./deploy.sh`. 
+    * This securely provisions the S3 Data Lake, Unity Catalog privileges, and the scheduled AWS Lambda Ingestion function.
+2.  **Data Workloads (Databricks CLI)**: 
+    * Authenticate your Databricks Workspace (`databricks configure`).
+    * Run `databricks bundle deploy` at the project root to automatically package and deploy the Medallion ETL pipeline (Bronze -> Silver -> Gold).
+3.  **Dashboards (UI + DABs Sync)**: 
+    * Build the dashboard visually in the Databricks Lakeview UI.
+    * Run `databricks bundle generate dashboard --existing-id <id>` to source-control the dashboard into the codebase.
 
 ## DataOps & Quality
 - **Idempotency**: Leveraging Delta Lake and Spark Structured Streaming checkpoints ensuring data logic can run concurrently without creating duplicate records.

@@ -1,0 +1,13 @@
+# Databricks Asset Bundles
+.databricks/
+
+# Terraform
+terraform/.terraform/
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+terraform/terraform.tfvars
+terraform/*tfplan
+terraform/extract_api_to_s3.zip
+
+# Environment Variables
+.env
