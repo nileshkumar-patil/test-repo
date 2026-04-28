@@ -60,3 +60,9 @@ targets:
   dev:
     # Set default target. It will use ~/.databrickscfg for Auth securely
     default: true
+  
+  prod:
+    # This explicitly maps to the --target prod executed by GitHub Actions
+    workspace:
+      host: https://adb-xxxxx.cloud.databricks.com # The CI/CD engine securely injects the prod host via ENV Variables
+
