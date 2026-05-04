@@ -19,37 +19,27 @@ resources:
         file_arrival:
           url: s3://tsnpdcl-analytics-datalake-poc-local/trigger/
 
-      # Use Serverless Compute instead of EC2 Auto-scaling
-      environments:
-        - environment_key: serverless_env
-          spec:
-            client: "1"
-
       # Sequential Medallion Workflow
       tasks:
         - task_key: bronze_ingestion
-          environment_key: serverless_env
           notebook_task:
             notebook_path: ./etl/bronze.ipynb
 
         - task_key: silver_incremental_load
           depends_on:
             - task_key: bronze_ingestion
-          environment_key: serverless_env
           notebook_task:
             notebook_path: ./etl/silver.ipynb
 
         - task_key: data_quality_checks
           depends_on:
             - task_key: silver_incremental_load
-          environment_key: serverless_env
           notebook_task:
             notebook_path: ./tests/test_data_quality.ipynb
 
         - task_key: gold_batch_aggregation
           depends_on:
             - task_key: data_quality_checks
-          environment_key: serverless_env
           notebook_task:
             notebook_path: ./etl/gold.ipynb
 
