@@ -1,5 +1,6 @@
 import json
-import requests
+import urllib.request
+import urllib.error
 import boto3
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
@@ -16,8 +17,10 @@ sns_client = boto3.client("sns")
 
 
 def get_download_links():
-    response = requests.get(API_URL).json()
-    resources = response.get("distribution", [])
+    req = urllib.request.Request(API_URL)
+    with urllib.request.urlopen(req) as response:
+        data = json.loads(response.read().decode())
+    resources = data.get("distribution", [])
     links = [r["data"]["downloadURL"] for r in resources if "csv" in r["data"]["downloadURL"].lower()]
     return links
 
@@ -38,17 +41,18 @@ def download_and_upload_to_s3(link):
         return "skipped", filename
 
     try:
-        with requests.get(link, stream=True, timeout=60) as r:
-            r.raise_for_status()
-
+        req = urllib.request.Request(link)
+        with urllib.request.urlopen(req, timeout=60) as response:
             s3_client.upload_fileobj(
-                Fileobj=r.raw,
+                Fileobj=response,
                 Bucket=S3_BUCKET,
                 Key=s3_key
             )
 
         return "downloaded", filename
 
+    except urllib.error.URLError as e:
+        return "failed", filename
     except Exception as e:
         return "failed", filename
 
