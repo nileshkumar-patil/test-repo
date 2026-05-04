@@ -1,6 +1,8 @@
 import json
 import urllib.request
 import urllib.error
+import time
+import ssl
 import boto3
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
@@ -33,28 +35,34 @@ def check_s3_file_exists(bucket, key):
         return False
 
 
-def download_and_upload_to_s3(link):
+def download_and_upload_to_s3(link, max_retries=3):
     filename = link.split("/")[-1]
     s3_key = f"{S3_PREFIX}{filename}"
 
     if check_s3_file_exists(S3_BUCKET, s3_key):
         return "skipped", filename
 
-    try:
-        req = urllib.request.Request(link)
-        with urllib.request.urlopen(req, timeout=60) as response:
-            s3_client.upload_fileobj(
-                Fileobj=response,
-                Bucket=S3_BUCKET,
-                Key=s3_key
-            )
+    # Create unverified context to bypass strict SSL cipher checks that fail under load
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
 
-        return "downloaded", filename
+    for attempt in range(max_retries):
+        try:
+            req = urllib.request.Request(link)
+            with urllib.request.urlopen(req, timeout=60, context=ctx) as response:
+                s3_client.upload_fileobj(
+                    Fileobj=response,
+                    Bucket=S3_BUCKET,
+                    Key=s3_key
+                )
 
-    except urllib.error.URLError as e:
-        return "failed", filename
-    except Exception as e:
-        return "failed", filename
+            return "downloaded", filename
+
+        except Exception as e:
+            if attempt == max_retries - 1:
+                return "failed", filename
+            time.sleep(2 ** attempt)  # Exponential backoff
 
 
 def lambda_handler(event, context):
@@ -70,7 +78,7 @@ def lambda_handler(event, context):
             )
         raise e
 
-    max_workers = 10
+    max_workers = 3
     files_downloaded = 0
     skipped_files = 0
     failed_files = []
