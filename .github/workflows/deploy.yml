@@ -1,3 +1,9 @@
+# =================================================================================
+# CI/CD Pipeline Configuration
+# This GitHub Actions workflow automates the deployment of our complete data architecture.
+# It validates and provisions AWS infrastructure via Terraform, and then securely deploys
+# the Databricks Medallion ETL logic and Jobs orchestration using Databricks Asset Bundles.
+# =================================================================================
 name: TSNPDCL Pipeline Deployment ⚡
 
 on:
@@ -43,6 +49,8 @@ jobs:
         run: terraform validate
 
   deploy-infrastructure:
+    # Deploys the core AWS infrastructure (S3, IAM, EventBridge) using Terraform.
+    # This step ensures our raw data lake and containerized ingestion roles are fully provisioned.
     name: "Deploy Infrastructure to AWS & Databricks"
     needs: validate-and-test
     if: github.ref == 'refs/heads/main'
@@ -113,6 +121,8 @@ jobs:
         run: terraform apply -auto-approve
 
   deploy-databricks-bundle:
+    # Deploys the Medallion ETL logic and Jobs orchestration to Databricks.
+    # This bundle contains the event-driven triggers and sequential task definitions.
     name: "Deploy Databricks Asset Bundle (Pipelines & Notebooks)"
     needs: deploy-infrastructure
     if: github.ref == 'refs/heads/main'

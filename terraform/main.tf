@@ -44,6 +44,9 @@ provider "databricks" {
 
 # Unified Data Lake Bucket (Combines Bronze, Silver, Gold into prefixes)
 # This simplifies IAM management and Unity Catalog configuration significantly
+# This terraform script manages the core AWS infrastructure and Unity Catalog setup. 
+# While databricks.yml orchestrates the actual ETL jobs, Terraform ensures the 
+# IAM roles, S3 buckets, and External Locations are provisioned automatically.
 
 resource "aws_s3_bucket" "datalake" {
   bucket        = "${var.project_prefix}-datalake-poc-${var.environment}"

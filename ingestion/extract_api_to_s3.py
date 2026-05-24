@@ -42,16 +42,18 @@ def check_s3_file_exists(bucket, key):
 
 
 def download_and_upload_to_s3(link, max_retries=3):
-    # This function takes a download link, checks if the corresponding file already exists in S3, and if not, 
-    # it attempts to download the file and upload it to S3.
+    # Take a download link, check if the corresponding file already exists in S3, and if not, 
+    # attempt to download the file and upload it to S3.
     
     filename = link.split("/")[-1]
     s3_key = f"{S3_PREFIX}{filename}"
 
+    # The script guarantees idempotency. Before downloading, it checks S3. 
+    # If a file exists, it skips it. Rerunning this app will not result in duplicated data.
     if check_s3_file_exists(S3_BUCKET, s3_key):
         return "skipped", filename
 
-    # Create unverified context to bypass strict SSL cipher checks that fail under load
+    # Create unverified context to bypass strict SSL cipher checks that fail under load.
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
@@ -74,6 +76,8 @@ def download_and_upload_to_s3(link, max_retries=3):
         except Exception as e:
             if attempt == max_retries - 1:
                 return "failed", filename
+            # Because government APIs are notoriously unstable, I had to implement robust error handling. 
+            # I built custom logic with exponential backoff...
             time.sleep(2 ** attempt)  # Exponential backoff
 
 
@@ -95,6 +99,7 @@ def lambda_handler(event, context):
     skipped_files = 0
     failed_files = []
 
+    # ...and a ThreadPoolExecutor to parallelize data extraction while managing concurrency limits.
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         tasks = [executor.submit(download_and_upload_to_s3, link) for link in download_links]
 
