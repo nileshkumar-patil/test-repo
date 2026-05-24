@@ -1,3 +1,5 @@
+# This is a Databricks Asset Bundle. It defines the entire workflow declaratively in a single YAML file, including jobs, tasks, schedules, and notifications.
+
 # yaml-language-server: $schema=bundle_config_schema.json
 bundle:
   name: tsnpdcl_analytics
