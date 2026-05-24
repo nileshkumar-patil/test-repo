@@ -75,7 +75,7 @@ resource "aws_lambda_function" "api_ingestion" {
   handler = "extract_api_to_s3.lambda_handler"
   runtime = "python3.10"
 
-  timeout     = 60  # 1 minute
+  timeout     = 300 # 5 minutes — monthly batch may have more files than a daily run
   memory_size = 512 # 512 MB
 
   environment {
@@ -89,19 +89,20 @@ resource "aws_lambda_function" "api_ingestion" {
 }
 
 # ==============================================================================
-# AWS EventBridge: Schedule the Lambda to run daily
+# AWS EventBridge: Schedule the Lambda to run on the 1st of every month
 # ==============================================================================
 
-# Create a cron schedule (e.g., Every day at 2:00 AM IST which is 20:30 UTC previous day)
-resource "aws_cloudwatch_event_rule" "daily_ingestion" {
-  name                = "${var.project_prefix}-daily-ingestion-${var.environment}"
-  description         = "Triggers the TSNPDCL API ingestion Lambda function daily"
-  schedule_expression = "cron(30 20 * * ? *)"
+# Monthly schedule: fires on the 1st of every month at 20:30 UTC (2:00 AM IST on the 2nd)
+# This aligns with TSNPDCL's monthly data release cadence on the Telangana Open Data portal.
+resource "aws_cloudwatch_event_rule" "monthly_ingestion" {
+  name                = "${var.project_prefix}-monthly-ingestion-${var.environment}"
+  description         = "Triggers the TSNPDCL API ingestion Lambda function on the 1st of every month"
+  schedule_expression = "cron(30 20 1 * ? *)"
 }
 
-# Attach the schedule to your Lambda function
+# Attach the monthly schedule to the Lambda function
 resource "aws_cloudwatch_event_target" "trigger_lambda" {
-  rule      = aws_cloudwatch_event_rule.daily_ingestion.name
+  rule      = aws_cloudwatch_event_rule.monthly_ingestion.name
   target_id = "TriggerLambdaIngestion"
   arn       = aws_lambda_function.api_ingestion.arn
 }
@@ -112,7 +113,7 @@ resource "aws_lambda_permission" "allow_eventbridge" {
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.api_ingestion.function_name
   principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.daily_ingestion.arn
+  source_arn    = aws_cloudwatch_event_rule.monthly_ingestion.arn
 }
 
 # ==============================================================================

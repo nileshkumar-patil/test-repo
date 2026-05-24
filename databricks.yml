@@ -1,3 +1,5 @@
+# This is a Databricks Asset Bundle. It defines the entire workflow declaratively in a single YAML file, including jobs, tasks, schedules, and notifications.
+
 # yaml-language-server: $schema=bundle_config_schema.json
 bundle:
   name: tsnpdcl_analytics
@@ -5,8 +7,12 @@ bundle:
 resources:
   jobs:
     tsnpdcl_pipeline:
-      # The Databricks Pipeline
-      name: tsnpdcl-end-to-end-pipeline
+      # The Databricks Monthly ETL Pipeline
+      # Schedule: Runs on the 2nd of every month at 3:00 AM IST (21:30 UTC on the 1st).
+      # This gives AWS Lambda (which fires at 2:00 AM IST on the 1st) a full 1-hour window
+      # to finish downloading all monthly CSV files from the Telangana Open Data portal
+      # before the Medallion ETL pipeline begins processing.
+      name: tsnpdcl-monthly-pipeline
 
       email_notifications:
         on_success:
@@ -14,10 +20,12 @@ resources:
         on_failure:
           - nileshkumar.patil@zemosolabs.com
 
-      # Trigger when Lambda finishes sending all files and drops the success token
-      trigger:
-        file_arrival:
-          url: s3://tsnpdcl-analytics-datalake-poc-local/trigger/
+      # Monthly periodic schedule — 2nd of every month at 3:00 AM IST (21:30 UTC on the 1st)
+      # Quartz cron: seconds minutes hours day-of-month month day-of-week year
+      schedule:
+        quartz_cron_expression: "0 30 21 1 * ?"
+        timezone_id: "UTC"
+        pause_status: UNPAUSED
 
       # Sequential Medallion Workflow
       tasks:
@@ -47,9 +55,8 @@ targets:
   dev:
     # Set default target. It will use ~/.databrickscfg for Auth securely
     default: true
-  
+
   prod:
     # This explicitly maps to the --target prod executed by GitHub Actions
     workspace:
-      host: https://adb-xxxxx.cloud.databricks.com # The CI/CD engine securely injects the prod host via ENV Variables
-
+      host: https://dbc-fcb103e0-45c4.cloud.databricks.com # The CI/CD engine securely injects the prod host via ENV Variables

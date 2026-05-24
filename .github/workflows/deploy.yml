@@ -7,7 +7,7 @@ on:
     branches: [ "main" ]
 
 env:
-  AWS_REGION: "us-east-1"
+  AWS_REGION: "ap-south-1"
   TF_WORKING_DIR: "terraform"
 
 jobs:
@@ -23,7 +23,14 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-          
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+              
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         
@@ -58,6 +65,41 @@ jobs:
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: terraform init
 
+      - name: Import Existing Resources
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          AWS_REGION: ${{ env.AWS_REGION }}
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+          TF_VAR_databricks_host: ${{ secrets.DATABRICKS_HOST }}
+          TF_VAR_databricks_token: ${{ secrets.DATABRICKS_TOKEN }}
+          TF_VAR_databricks_workspace_id: ${{ secrets.DATABRICKS_WORKSPACE_ID }}
+          TF_VAR_databricks_account_id: ${{ secrets.DATABRICKS_ACCOUNT_ID }}
+          TF_VAR_sql_warehouse_id: ${{ secrets.DATABRICKS_SQL_WAREHOUSE_ID }}
+        run: |
+          # Safe import function
+          import_if_exists() {
+            local resource_addr=$1
+            local resource_id=$2
+            local check_cmd=$3
+            
+            if ! terraform state list | grep -q "^${resource_addr}$"; then
+              if eval "$check_cmd" > /dev/null 2>&1; then
+                echo "Importing existing resource $resource_addr..."
+                terraform import "$resource_addr" "$resource_id" || true
+              fi
+            fi
+          }
+          
+          # Check and import Lambda Function
+          import_if_exists "aws_lambda_function.api_ingestion" "tsnpdcl-analytics-api-ingestion-dev" "aws lambda get-function --function-name tsnpdcl-analytics-api-ingestion-dev"
+          
+          # Check and import IAM Role for Databricks
+          import_if_exists "aws_iam_role.databricks_data_access" "tsnpdcl-analytics-databricks-access-dev" "aws iam get-role --role-name tsnpdcl-analytics-databricks-access-dev"
+          
+          # Check and import Lambda Exec Role
+          import_if_exists "aws_iam_role.lambda_exec_role" "tsnpdcl-analytics-lambda-exec-dev" "aws iam get-role --role-name tsnpdcl-analytics-lambda-exec-dev"
+
       - name: Terraform Apply
         working-directory: ${{ env.TF_WORKING_DIR }}
         env:
@@ -87,3 +129,4 @@ jobs:
           DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
           DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
         run: databricks bundle deploy --target prod
+        

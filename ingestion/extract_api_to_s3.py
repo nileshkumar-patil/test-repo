@@ -19,6 +19,10 @@ sns_client = boto3.client("sns")
 
 
 def get_download_links():
+    # hits the Telangana API to get the latest download links for CSV files. 
+    # parces the JSON metadata response to extract the download URLs, and returns a list of links.
+    # It filters the resources to only include those with "csv" in the URL, ensuring we only attempt to download relevant files.
+
     req = urllib.request.Request(API_URL)
     with urllib.request.urlopen(req) as response:
         data = json.loads(response.read().decode())
@@ -28,6 +32,8 @@ def get_download_links():
 
 
 def check_s3_file_exists(bucket, key):
+    # This function checks if a file already exists in S3 by attempting to retrieve its metadata using head_object.
+
     try:
         response = s3_client.head_object(Bucket=bucket, Key=key)
         return response["ContentLength"] > 0
@@ -36,6 +42,9 @@ def check_s3_file_exists(bucket, key):
 
 
 def download_and_upload_to_s3(link, max_retries=3):
+    # This function takes a download link, checks if the corresponding file already exists in S3, and if not, 
+    # it attempts to download the file and upload it to S3.
+    
     filename = link.split("/")[-1]
     s3_key = f"{S3_PREFIX}{filename}"
 
@@ -49,6 +58,9 @@ def download_and_upload_to_s3(link, max_retries=3):
 
     for attempt in range(max_retries):
         try:
+            # Intentionally chose Python's build-n urllib insted of popular requests library 
+            # because lambda functions need external libraries bundled as layers or packages.
+            # using urllib means zero dependencies  
             req = urllib.request.Request(link)
             with urllib.request.urlopen(req, timeout=60, context=ctx) as response:
                 s3_client.upload_fileobj(
@@ -109,13 +121,16 @@ def lambda_handler(event, context):
     # Trigger Databricks if new files arrived
     if files_downloaded > 0:
 
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        trigger_file_key = f"trigger/run_{timestamp}.txt"
+        # Stamp the trigger file with year+month so each monthly run creates a unique idempotent key
+        # this is a success token - It's what triggers the entire databricks pipeline. To avoid race condition possible.
+
+        year_month = datetime.now().strftime('%Y%m')
+        trigger_file_key = f"trigger/run_{year_month}.txt"
 
         s3_client.put_object(
             Bucket=S3_BUCKET,
             Key=trigger_file_key,
-            Body=f"Triggering pipeline. Processed {files_downloaded} new files."
+            Body=f"Monthly batch complete. Processed {files_downloaded} new file(s) for {year_month}."
         )
 
     return {
