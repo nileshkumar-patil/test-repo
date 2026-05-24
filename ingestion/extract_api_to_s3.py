@@ -19,6 +19,10 @@ sns_client = boto3.client("sns")
 
 
 def get_download_links():
+    # hits the Telangana API to get the latest download links for CSV files. 
+    # parces the JSON metadata response to extract the download URLs, and returns a list of links.
+    # It filters the resources to only include those with "csv" in the URL, ensuring we only attempt to download relevant files.
+
     req = urllib.request.Request(API_URL)
     with urllib.request.urlopen(req) as response:
         data = json.loads(response.read().decode())
@@ -28,6 +32,8 @@ def get_download_links():
 
 
 def check_s3_file_exists(bucket, key):
+    # This function checks if a file already exists in S3 by attempting to retrieve its metadata using head_object.
+
     try:
         response = s3_client.head_object(Bucket=bucket, Key=key)
         return response["ContentLength"] > 0
@@ -36,19 +42,27 @@ def check_s3_file_exists(bucket, key):
 
 
 def download_and_upload_to_s3(link, max_retries=3):
+    # Take a download link, check if the corresponding file already exists in S3, and if not, 
+    # attempt to download the file and upload it to S3.
+    
     filename = link.split("/")[-1]
     s3_key = f"{S3_PREFIX}{filename}"
 
+    # The script guarantees idempotency. Before downloading, it checks S3. 
+    # If a file exists, it skips it. Rerunning this app will not result in duplicated data.
     if check_s3_file_exists(S3_BUCKET, s3_key):
         return "skipped", filename
 
-    # Create unverified context to bypass strict SSL cipher checks that fail under load
+    # Create unverified context to bypass strict SSL cipher checks that fail under load.
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
 
     for attempt in range(max_retries):
         try:
+            # Intentionally chose Python's build-n urllib insted of popular requests library 
+            # because lambda functions need external libraries bundled as layers or packages.
+            # using urllib means zero dependencies  
             req = urllib.request.Request(link)
             with urllib.request.urlopen(req, timeout=60, context=ctx) as response:
                 s3_client.upload_fileobj(
@@ -62,6 +76,8 @@ def download_and_upload_to_s3(link, max_retries=3):
         except Exception as e:
             if attempt == max_retries - 1:
                 return "failed", filename
+            # Because government APIs are notoriously unstable, I had to implement robust error handling. 
+            # I built custom logic with exponential backoff...
             time.sleep(2 ** attempt)  # Exponential backoff
 
 
@@ -83,6 +99,7 @@ def lambda_handler(event, context):
     skipped_files = 0
     failed_files = []
 
+    # ...and a ThreadPoolExecutor to parallelize data extraction while managing concurrency limits.
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         tasks = [executor.submit(download_and_upload_to_s3, link) for link in download_links]
 
@@ -110,6 +127,8 @@ def lambda_handler(event, context):
     if files_downloaded > 0:
 
         # Stamp the trigger file with year+month so each monthly run creates a unique idempotent key
+        # this is a success token - It's what triggers the entire databricks pipeline. To avoid race condition possible.
+
         year_month = datetime.now().strftime('%Y%m')
         trigger_file_key = f"trigger/run_{year_month}.txt"
 

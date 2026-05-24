@@ -1,3 +1,8 @@
+
+
+#remote backend configuration terraform state is stored in S3 bucket and a DynamoDB table acts as a distributed lock.
+#This means multiple developers or CI/CD runs can never currupt the state file simultaneously.
+
 terraform {
   backend "s3" {
     bucket         = "tsnpdcl-terraform-state-backend"
@@ -38,6 +43,11 @@ provider "databricks" {
 # ==============================================================================
 
 # Unified Data Lake Bucket (Combines Bronze, Silver, Gold into prefixes)
+# This simplifies IAM management and Unity Catalog configuration significantly
+# This terraform script manages the core AWS infrastructure and Unity Catalog setup. 
+# While databricks.yml orchestrates the actual ETL jobs, Terraform ensures the 
+# IAM roles, S3 buckets, and External Locations are provisioned automatically.
+
 resource "aws_s3_bucket" "datalake" {
   bucket        = "${var.project_prefix}-datalake-poc-${var.environment}"
   force_destroy = true # Useful for a POC to easily tear down
@@ -60,6 +70,7 @@ resource "aws_s3_object" "trigger_dir" {
 # ------------------------------------------------------------------------------
 # IAM Cross-Account Role for Databricks Access
 # ------------------------------------------------------------------------------
+
 
 data "aws_caller_identity" "current" {}
 

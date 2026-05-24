@@ -7,6 +7,8 @@
 
 -- KPI 1: Seasonal Consumption Variance
 -- Visualization: Bar Chart (X: Season, Y: Total Units, Color/Group: extraction_year)
+-- Because we did the heavy lifting in our data modelling phase during the Gold layer build, 
+-- these SQL queries are highly optimized. We calculate Seasonal Consumption Variance...
 SELECT 
     Season,
     extraction_year,
@@ -43,6 +45,7 @@ ORDER BY Circle, Month_Year;
 -- KPI 4: Revenue Protection (High-Loss Sections)
 -- Visualization: Scatter Plot (X: Section, Y: Service_Gap)
 -- Identifying Sections where the most services went unbilled
+-- Revenue Protection hotspots
 SELECT 
     Section,
     Service_Gap
@@ -70,6 +73,8 @@ LIMIT 20;
 -- KPI 6: Post-Pandemic Recovery
 -- Visualization: Gauge Chart or Bullet Chart (Value: Recovery_Index_Pct)
 -- Shows if 2022-2023 consumption exceeded the 2019 baseline (100% means full recovery)
+-- Post-Pandemic Recovery Indexes. These queries power a Databricks Lakeview Dashboard, 
+-- providing stakeholders with sub-second response times thanks to Delta Lake's caching capabilities.
 SELECT 
     Circle,
     Baseline_2019 AS Avg_Units_2019,

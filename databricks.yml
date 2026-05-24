@@ -1,3 +1,5 @@
+# This is a Databricks Asset Bundle. It defines the entire workflow declaratively in a single YAML file, including jobs, tasks, schedules, and notifications.
+
 # yaml-language-server: $schema=bundle_config_schema.json
 bundle:
   name: tsnpdcl_analytics
@@ -18,14 +20,17 @@ resources:
         on_failure:
           - nileshkumar.patil@zemosolabs.com
 
-      # Monthly periodic schedule — 2nd of every month at 3:00 AM IST (21:30 UTC on the 1st)
-      # Quartz cron: seconds minutes hours day-of-month month day-of-week year
-      schedule:
-        quartz_cron_expression: "0 30 21 1 * ?"
-        timezone_id: "UTC"
-        pause_status: UNPAUSED
+      # Event-based trigger: Fires when the Lambda function writes the success token
+      # to the trigger/ directory in the S3 datalake
+      # The orchestration is event-driven. The moment the ingestion container successfully drops 
+      # all data into S3, it writes a success token. Databricks detects this and triggers the pipeline.
+      trigger:
+        file_arrival:
+          url: s3://tsnpdcl-analytics-datalake-poc-dev/trigger/
 
       # Sequential Medallion Workflow
+      # There's no race condition. The pipeline orchestrates the Bronze, Silver, and Gold tasks in 
+      # strict sequential order. This guarantees our end-to-end data pipeline is fully synchronized.
       tasks:
         - task_key: bronze_ingestion
           notebook_task:
