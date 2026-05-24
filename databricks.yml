@@ -20,12 +20,11 @@ resources:
         on_failure:
           - nileshkumar.patil@zemosolabs.com
 
-      # Monthly periodic schedule — 2nd of every month at 3:00 AM IST (21:30 UTC on the 1st)
-      # Quartz cron: seconds minutes hours day-of-month month day-of-week year
-      schedule:
-        quartz_cron_expression: "0 30 21 1 * ?"
-        timezone_id: "UTC"
-        pause_status: UNPAUSED
+      # Event-based trigger: Fires when the Lambda function writes the success token
+      # to the trigger/ directory in the S3 datalake
+      trigger:
+        file_arrival:
+          url: s3://tsnpdcl-analytics-datalake-poc-dev/trigger/
 
       # Sequential Medallion Workflow
       tasks:
