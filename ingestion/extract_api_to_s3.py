@@ -30,6 +30,9 @@ def get_download_links():
     links = [r["data"]["downloadURL"] for r in resources if "csv" in r["data"]["downloadURL"].lower()]
     return links
 
+    # Intentionally chose Python's build-n urllib insted of popular requests library 
+    # because lambda functions need external libraries bundled as layers or packages.
+    # using urllib means zero dependencies 
 
 def check_s3_file_exists(bucket, key):
     # This function checks if a file already exists in S3 by attempting to retrieve its metadata using head_object.

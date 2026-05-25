@@ -1,4 +1,6 @@
-
+# This terraform script manages the core AWS infrastructure and Unity Catalog setup. 
+# While databricks.yml orchestrates the actual ETL jobs, Terraform ensures the 
+# IAM roles, S3 buckets, and External Locations are provisioned automatically.
 
 #remote backend configuration terraform state is stored in S3 bucket and a DynamoDB table acts as a distributed lock.
 #This means multiple developers or CI/CD runs can never currupt the state file simultaneously.
@@ -44,9 +46,7 @@ provider "databricks" {
 
 # Unified Data Lake Bucket (Combines Bronze, Silver, Gold into prefixes)
 # This simplifies IAM management and Unity Catalog configuration significantly
-# This terraform script manages the core AWS infrastructure and Unity Catalog setup. 
-# While databricks.yml orchestrates the actual ETL jobs, Terraform ensures the 
-# IAM roles, S3 buckets, and External Locations are provisioned automatically.
+
 
 resource "aws_s3_bucket" "datalake" {
   bucket        = "${var.project_prefix}-datalake-poc-${var.environment}"
@@ -71,12 +71,27 @@ resource "aws_s3_object" "trigger_dir" {
 # IAM Cross-Account Role for Databricks Access
 # ------------------------------------------------------------------------------
 
-
+# Retrieves the AWS account ID of the current environment.
 data "aws_caller_identity" "current" {}
+
+
+# Creates a trust policy that allows the Databricks Workspace
+# to assume the IAM role using STS AssumeRole.
 
 data "databricks_aws_assume_role_policy" "workspace" {
   external_id = var.databricks_workspace_id
 }
+
+
+# Creates a trust policy specifically for Unity Catalog.
+#
+# This enables:
+# - External Locations
+# - Storage Credentials
+# - Governed access to S3
+#
+# Unity Catalog will use this IAM role to securely access
+# data stored in the S3 data lake.
 
 data "databricks_aws_unity_catalog_assume_role_policy" "uc" {
   aws_account_id = data.aws_caller_identity.current.account_id
@@ -84,7 +99,11 @@ data "databricks_aws_unity_catalog_assume_role_policy" "uc" {
   external_id    = var.databricks_account_id
 }
 
+
+# Instead of creating separate IAM roles,
+# both trust policies are merged into a single role.
 # Combine the Workspaces and Unity Catalog trust policies dynamically
+
 data "aws_iam_policy_document" "databricks_trust_policy" {
   source_policy_documents = [
     data.databricks_aws_assume_role_policy.workspace.json,
@@ -101,12 +120,18 @@ data "aws_iam_policy_document" "databricks_trust_policy" {
   }
 }
 
+
+# This is the main IAM role that Databricks assumes
+# to access AWS resources securely.
+
 resource "aws_iam_role" "databricks_data_access" {
   name               = "${var.project_prefix}-databricks-access-${var.environment}"
   assume_role_policy = data.aws_iam_policy_document.databricks_trust_policy.json
 }
 
 # 2. Data Access Policy allowing read/write to the Databricks Lake bucket
+# S3 Access Policy for Data Lake Bucket
+
 data "aws_iam_policy_document" "databricks_s3_policy" {
   statement {
     actions = [
@@ -130,6 +155,19 @@ resource "aws_iam_role_policy" "databricks_s3_access" {
 }
 
 # 3. Create the Instance Profile for EC2 clusters (Legacy/Workflows)
+# Databricks clusters run on AWS EC2 instances.
+#
+# EC2 instances cannot directly use IAM roles.
+# AWS requires an Instance Profile to attach IAM roles to EC2.
+#
+# This profile allows Databricks clusters to inherit:
+# - S3 permissions
+# - IAM role permissions
+#
+# Used mainly for:
+# - Databricks clusters
+# - Jobs/workflows
+
 resource "aws_iam_instance_profile" "databricks_profile" {
   name = "${var.project_prefix}-databricks-profile-${var.environment}"
   role = aws_iam_role.databricks_data_access.name
